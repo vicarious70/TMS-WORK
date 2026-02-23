@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/>
+<meta content="no-cache" http-equiv="Pragma"/>
+<meta content="0" http-equiv="Expires"/>
+<title>Trucking Made Simple — Test Run</title>
+<link href="styles.css?v=autosaveAddr1" rel="stylesheet"/>
+
+<!-- Supabase (auth + edge functions) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // ==== TMS Paywall Config (LIVE) ====
+  window.TMS_SUPABASE_URL = "https://ggvfkeerwjnpgxhmatcv.supabase.co";
+  window.TMS_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdndmZrZWVyd2pucGd4aG1hdGN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwMTExMDUsImV4cCI6MjA4NjU4NzEwNX0.19uIlLby_YMAda7wlHPfKmWJ0inUhEmyashcl3QRVJs";
+  window.TMS_STRIPE_PRICE_ID = "price_1T3Kt73w0uK0t0VRUF3zxr3Z";
+  // Supabase Edge Functions
+  window.TMS_FN_CREATE_CHECKOUT = "create-checkout-session";
+  window.TMS_FN_CREATE_PORTAL = "create-portal-session";
+  window.TMS_FN_SYNC_SUBSCRIPTION = "sync-subscription";
+</script>
+
+</head>
+<body>
+<!-- TMS Paywall Overlay -->
+<div id="tmsPaywall" class="tms-paywall" aria-hidden="true">
+  <div class="tms-paywall-card">
+    <h1>Unlock Trucking Made Simple™</h1>
+    <p class="tms-paywall-sub">Sign in, then subscribe to unlock the full app.</p>
+
+    <div id="tmsPaywallStatus" class="tms-paywall-status" style="display:none;"></div>
+
+    <div id="tmsAuthBlock" class="tms-auth">
+      <label>Email</label>
+      <input id="tmsEmail" type="email" placeholder="you@example.com" autocomplete="email"/>
+      <label>Password</label>
+      <input id="tmsPass" type="password" placeholder="Create / enter a password" autocomplete="current-password"/>
+      <div class="tms-row">
+        <button id="tmsBtnSignIn" class="tms-btn">Sign in</button>
+        <button id="tmsBtnSignUp" class="tms-btn tms-btn-outline">Create account</button>
+      </div>
+      <details class="tms-magic">
+        <summary>Having trouble? Use a magic link instead</summary>
+        <button id="tmsBtnMagic" class="tms-btn tms-btn-outline" style="margin-top:10px;">Send magic link</button>
+      </details>
+    </div>
+
+    <div id="tmsSubBlock" class="tms-sub" style="display:none;">
+      <div class="tms-signedin">
+        <div>
+          <div class="tms-muted">Signed in as</div>
+          <div id="tmsSignedInAs" class="tms-email"></div>
+        </div>
+        <button id="tmsBtnSignOut" class="tms-btn tms-btn-outline">Sign out</button>
+      </div>
+
+      <div class="tms-row" style="margin-top:14px; flex-wrap:wrap; gap:10px;">
+        <button id="tmsBtnSubscribe" class="tms-btn">Subscribe &amp; Unlock</button>
+        <button id="tmsBtnRefresh" class="tms-btn tms-btn-outline">I already subscribed — Refresh</button>
+        <button id="tmsBtnPortal" class="tms-btn tms-btn-outline">Profile / Manage subscription</button>
+      </div>
+
+      <p class="tms-note">After payment, you’ll be returned here automatically. If the app still looks locked, tap “Refresh”.</p>
+    </div>
+
+    <p class="tms-legal">By subscribing, you agree this app is provided “as-is” and you are responsible for verifying loads.</p>
+  </div>
+</div>
+
+<div id="appRoot">
+
+<header class="topbar">
+  <div class="brand">
+    <button class="brandMenuBtn" id="brandMenuBtn" type="button" aria-label="Open menu"><span class="brand-icon" aria-hidden="true">
+      <!-- Animated truck icon (inline SVG, no external dependency) -->
+      <svg class="truck-svg" viewBox="0 0 64 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Truck">
+  <!-- body -->
+  <rect x="2" y="10" width="34" height="12" rx="2" class="truck-body"/>
+  <rect x="36" y="12" width="16" height="10" rx="2" class="truck-cab"/>
+  <rect x="50" y="14" width="12" height="8" rx="2" class="truck-trailer"/>
+  <rect x="40" y="14" width="6" height="4" rx="1" class="truck-window"/>
+
+  <!-- wheels (each wheel group rotates) -->
+  <g class="wheel-group" style="transform-origin: 14px 24px;">
+    <circle cx="14" cy="24" r="4.2" class="truck-wheel"/>
+    <circle cx="14" cy="24" r="1.3" class="truck-wheel-hub"/>
+    <line x1="14" y1="24" x2="14" y2="19.9" class="truck-wheel-spoke"/>
+    <line x1="14" y1="24" x2="17.0" y2="21.0" class="truck-wheel-spoke"/>
+    <line x1="14" y1="24" x2="18.1" y2="24" class="truck-wheel-spoke"/>
+    <line x1="14" y1="24" x2="17.0" y2="27.0" class="truck-wheel-spoke"/>
+    <line x1="14" y1="24" x2="14" y2="28.1" class="truck-wheel-spoke"/>
+    <line x1="14" y1="24" x2="11.0" y2="27.0" class="truck-wheel-spoke"/>
+    <line x1="14" y1="24" x2="9.9" y2="24" class="truck-wheel-spoke"/>
+    <line x1="14" y1="24" x2="11.0" y2="21.0" class="truck-wheel-spoke"/>
+  </g>
+
+  <g class="wheel-group" style="transform-origin: 40px 24px;">
+    <circle cx="40" cy="24" r="4.2" class="truck-wheel"/>
+    <circle cx="40" cy="24" r="1.3" class="truck-wheel-hub"/>
+    <line x1="40" y1="24" x2="40" y2="19.9" class="truck-wheel-spoke"/>
+    <line x1="40" y1="24" x2="43.0" y2="21.0" class="truck-wheel-spoke"/>
+    <line x1="40" y1="24" x2="44.1" y2="24" class="truck-wheel-spoke"/>
+    <line x1="40" y1="24" x2="43.0" y2="27.0" class="truck-wheel-spoke"/>
+    <line x1="40" y1="24" x2="40" y2="28.1" class="truck-wheel-spoke"/>
+    <line x1="40" y1="24" x2="37.0" y2="27.0" class="truck-wheel-spoke"/>
+    <line x1="40" y1="24" x2="35.9" y2="24" class="truck-wheel-spoke"/>
+    <line x1="40" y1="24" x2="37.0" y2="21.0" class="truck-wheel-spoke"/>
+  </g>
+
+  <g class="wheel-group" style="transform-origin: 56px 24px;">
+    <circle cx="56" cy="24" r="4.2" class="truck-wheel"/>
+    <circle cx="56" cy="24" r="1.3" class="truck-wheel-hub"/>
+    <line x1="56" y1="24" x2="56" y2="19.9" class="truck-wheel-spoke"/>
+    <line x1="56" y1="24" x2="59.0" y2="21.0" class="truck-wheel-spoke"/>
+    <line x1="56" y1="24" x2="60.1" y2="24" class="truck-wheel-spoke"/>
+    <line x1="56" y1="24" x2="59.0" y2="27.0" class="truck-wheel-spoke"/>
+    <line x1="56" y1="24" x2="56" y2="28.1" class="truck-wheel-spoke"/>
+    <line x1="56" y1="24" x2="53.0" y2="27.0" class="truck-wheel-spoke"/>
+    <line x1="56" y1="24" x2="51.9" y2="24" class="truck-wheel-spoke"/>
+    <line x1="56" y1="24" x2="53.0" y2="21.0" class="truck-wheel-spoke"/>
+  </g>
+</svg>
+    </span></button>
+    <span class="brand-title">Trucking Made Simple™</span>
+  </div>
+
+  <!-- Mobile-friendly nav (shows 1–2 tabs + a More dropdown). Desktop uses the scrollable pill tabs. -->
+  <nav class="mobileTabs" id="mobileTabs" aria-label="Mobile navigation">
+  <button class="mTab" type="button" data-screen="settings" id="mTabSettings">Settings</button>
+  <button class="mTab" type="button" data-screen="scenario" id="mTabScenario">Scenario</button>
+  <button class="mMoreBtn" type="button" id="mMoreBtn" aria-haspopup="true" aria-expanded="false">
+    ▾
+  </button>
+</nav>
+<div class="mobileMenuPanel" id="mobileMenuPanel" aria-hidden="true">
+  <div class="mobileMenuInner" role="menu" aria-label="More tabs">
+    <!-- items injected by JS -->
+  </div>
+</div>
+
+<div class="tabsWrap" aria-label="App navigation">
+  <button class="tabsScrollBtn" id="tabsScrollLeft" type="button" aria-label="Scroll tabs left">◀</button>
+  <div class="tabs" id="tabs" role="tablist" aria-label="Modules">
+    <button class="tab active" data-screen="settings" type="button">Settings</button>
+    <button class="tab" data-screen="scenario" type="button">Scenario</button>
+    <!-- NEW: Internal Gate (driver-only) lives between Scenario and Trip. Does NOT replace the existing Gate tab. -->
+    <button class="tab" data-screen="gateInternal" type="button">Gate (Internal)</button>
+    <button class="tab" data-screen="trip" type="button">Trip</button>
+    <button class="tab" data-screen="actual" type="button">Actual</button>
+    <button class="tab" data-screen="reserve" type="button">Reserve</button>
+    <button class="tab" data-screen="bank" type="button">Bank</button>
+    <button class="tab" data-screen="totals" type="button">Totals</button>
+    <button class="tab" id="tabFleet" data-screen="fleet" type="button">Fleet</button>
+    <button class="tab" data-screen="broker" type="button">Broker</button>
+    <!-- ORIGINAL Gate remains where it is (near the right end). -->
+    <button class="tab" data-screen="gate" type="button">Gate</button>
+    <button class="tab" data-screen="loads" type="button">Loads</button>
+  </div>
+  <div class="tabsMore desktopOnly">
+    <label class="sr-only" for="desktopMore">More</label>
+    <select id="desktopMore" class="tabsMoreSelect" aria-label="More tabs">
+      <option value="">▾</option>
+    </select>
+  </div>
+  </div>
+  <button class="tabsScrollBtn" id="tabsScrollRight" type="button" aria-label="Scroll tabs right">▶</button>
+</div>
+<div class="topbar-right">
+  <span class="pill good" id="maintPill">🟢 Maintenance OK</span>
+  <span id="paywallAuthStatus" class="topbar-auth"></span>
+  <span id="topbarStatus" class="topbar-status"></span>
+  <button id="btnTopProfile" class="topbar-action" type="button" hidden>Profile</button>
+  <button id="btnTopSignOut" class="topbar-action" type="button" hidden>Sign out</button>
+</div></header>
+<main class="wrap">
+<!-- SETTINGS -->
+<section class="screen active" id="screen-settings">
+<h1>Settings (Required)</h1>
+<p class="lockNotice">
+  🔒 <strong>Plain Lock:</strong> Settings control <strong>preferences + defaults only</strong>.
+  They do <strong>not</strong> change Scenario/Actual formulas or historical truth.
+</p>
+
+<details class="collapsibleSection" id="fleetCarrierSection">
+  <summary>Carrier Mode (Fleet Tools)</summary>
+  <div class="collapsibleInner">
+    <div class="grid">
+      <label class="check">
+        <input id="fleet_carrierMode" type="checkbox"/>
+        Enable Carrier Mode (shows Fleet tab)
+      </label>
+
+      <label>Driver Pay Basis (company-wide)
+        <select id="fleet_companyPayBasis">
+          <option value="net">Net (recommended)</option>
+          <option value="gross">Gross (Revenue only)</option>
+        </select>
+      </label>
+
+      <label>Pay Week Starts On
+        <select id="fleet_weekStart">
+          <option value="MON">Monday</option>
+          <option value="SUN">Sunday</option>
+        </select>
+      </label>
+    </div>
+    <p class="hint">
+      Carrier Mode is isolated. It does <strong>not</strong> change Scenario/Actual math. Fleet reads saved Actual loads and creates separate settlement records.
+    </p>
+  </div>
+</details>
+
+<div class="grid">
+<label>Monthly Household Fixed
+          <input id="s_household" placeholder="5259" step="0.01" type="number"/>
+</label>
+<label>Monthly Business Fixed
+          <input id="s_businessFixed" placeholder="1742" step="0.01" type="number"/>
+</label>
+<label>Lifetime Avg MPG (auto)
+          <input id="s_lifetimeMpg" placeholder="0.00" readonly="" step="0.01" type="number"/>
+</label>
+<label>Fallback MPG (locked until lifetime exists)
+          <input id="s_defaultMpg" placeholder="4.60" step="0.01" type="number"/ readonly="">
+</label>
+<label>Tank Capacity (gal)
+          <input id="s_tank" placeholder="280" step="1" type="number"/>
+</label>
+<label>Fuel Stop Minutes
+          <input id="s_fuelStopMin" placeholder="15" step="1" type="number"/>
+</label>
+<label>
+  <span>Average MPH used:</span>
+  <span><span id="s_avgMphVal">60</span> mph</span>
+  <input id="s_avgMph" max="65" min="45" step="1" type="range" value="60"/>
+</label>
+
+<div class="note full-span">
+  <div><strong>Trip Miles Auto-Calc:</strong> Google Maps routing is enabled in this build.</div>
+  <div class="muted">No API key entry needed on new devices. (Key is embedded + restricted by referrer in Google Cloud.)</div>
+</div>
+
+</div>
+<!-- Company Info (Auto-Saves) -->
+<h2>Company Info (Auto-Saves)</h2>
+<p class="hint">Used for Invoice + Email signatures.</p>
+<div class="grid">
+<label>Your Name
+    <input id="s_ownerName" placeholder="e.g., Anthony Ford" type="text"/>
+</label>
+<label>Company Name
+    <input id="s_companyName" placeholder="e.g., Trucking Made Simple LLC" type="text"/>
+</label>
+<label>MC #
+    <input id="s_mcNumber" placeholder="e.g., 123456" type="text"/>
+</label>
+<label>DOT #
+    <input id="s_dotNumber" placeholder="e.g., 1234567" type="text"/>
+</label>
+<label>Truck #
+    <input id="s_truckNumber" placeholder="e.g., 701" type="text"/>
+</label>
+<label>Trailer #
+    <input id="s_trailerNumber" placeholder="e.g., 9123" type="text"/>
+</label>
+<label>Phone
+    <input id="s_companyPhone" placeholder="e.g., 555-555-5555" type="tel"/>
+</label>
+<label>Email
+    <input id="s_companyEmail" placeholder="e.g., dispatch@yourcompany.com" type="email"/>
+</label>
+</div>
+<h2>Reserves (percent as decimals)</h2>
+<div class="grid">
+<label>Factoring
+          <input id="r_factoring" placeholder="0.02" step="0.01" type="number"/>
+</label>
+<label>Tax
+          <input id="r_tax" placeholder="0.28" step="0.01" type="number"/>
+</label>
+<label>Plates
+          <input id="r_plates" placeholder="0.05" step="0.01" type="number"/>
+</label>
+<label>IFTA
+          <input id="r_ifta" placeholder="0.05" step="0.01" type="number"/>
+</label>
+<label>Maintenance
+          <input id="r_maint" placeholder="0.07" step="0.01" type="number"/>
+</label>
+<label>Highway Use
+          <input id="r_highway" placeholder="0.05" step="0.01" type="number"/>
+</label>
+<label>Tires
+          <input id="r_tires" placeholder="0.05" step="0.01" type="number"/>
+</label>
+</div><h2>Maintenance (Oil Change)</h2><p class="hint">Configure oil change tracking here. The maintenance dot at the top will reflect your status (OK / Due Soon / Overdue).</p><div class="grid"><label>Current Odometer
+          <input id="m_currentOdo" placeholder="e.g., 523450" step="1" type="number"/></label><label>Last Oil Change Odometer
+          <input id="m_lastOilOdo" placeholder="e.g., 510000" step="1" type="number"/></label><label>Oil Change Interval (miles)
+          <select id="m_oilInterval"><option value="10000">10,000</option><option value="15000">15,000</option><option value="custom">Custom</option></select></label><label>Custom Interval (if Custom)
+          <input id="m_oilCustom" placeholder="e.g., 12000" step="1" type="number"/></label><label>Due Soon Alert Threshold (miles)
+          <input id="m_dueSoon" placeholder="e.g., 500" step="1" type="number"/></label></div><h2>Reserve + Bank (Starting Balances)</h2><p class="hint">Optional. Totals screen will add these starting balances to computed Reserve/Bank totals from saved Actual loads.</p><div class="grid"><label>Starting Reserve Balance ($)
+          <input id="s_reserveStart" placeholder="0" step="0.01" type="number"/></label><label>Starting Bank Balance ($)
+          <input id="s_bankStart" placeholder="0" step="0.01" type="number"/></label></div>
+<div class="row">
+<button id="btnLoadTestData" type="button">Load Test Data</button>
+<button class="primary" id="btnSaveSettings" type="button">Save Settings</button>
+<button id="btnResetSettings" type="button">Reset to Defaults</button>
+</div>
+<div class="lockBox">
+<div class="lockTitle">🔐 What Settings Can’t Change</div>
+<ul class="lockList">
+<li>Scenario math / formulas</li>
+<li>O.T.R.A.F.F calculation method</li>
+<li>Actual history / totals</li>
+</ul>
+<p class="hint" style="margin:8px 0 0;">
+    If it affects money math, time math, or truth — it does not belong in Settings.
+  </p>
+</div>
+<pre class="output" id="settingsFinePrint">—</pre>
+<p class="hint" id="settingsHint"></p>
+</section>
+
+<!-- GATE (INTERNAL) - Driver-only Regional Minimum Rate Engine -->
+<section class="screen" id="screen-gateInternal">
+  <h1>Gate (Internal) — Regional Minimum Rate</h1>
+  <p class="lockNotice">
+    🔒 <strong>Plain Lock:</strong> Driver-only negotiation tool. Mirrors Scenario cost math but adds realistic regional + time-away factors.
+    This does <strong>not</strong> replace the original <strong>Gate</strong> (shipper-facing) tab.
+  </p>
+
+  <div class="grid">
+    <label>Origin State (2-letter)
+      <input id="gi_originState" type="text" maxlength="2" placeholder="OH" />
+    </label>
+    <label>Destination State (2-letter)
+      <input id="gi_destState" type="text" maxlength="2" placeholder="NY" />
+    </label>
+
+    <label>Total Trip Miles (lane + reposition)
+      <input id="gi_totalMiles" type="number" step="1" placeholder="980" />
+    </label>
+    <label>Fuel Price ($/gal)
+      <input id="gi_fuelPrice" type="number" step="0.01" placeholder="3.75" />
+    </label>
+
+    <label>Tolls ($)
+      <input id="gi_tolls" type="number" step="0.01" placeholder="160" />
+    </label>
+    <label>Wait Forecast (hrs)
+      <input id="gi_waitHrs" type="number" step="0.25" placeholder="0" />
+    </label>
+
+    <label>Detention Rate ($/hr after 1 free hr)
+      <input id="gi_detentionRate" type="number" step="1" placeholder="100" />
+    </label>
+    <label>Risk Buffer (%)
+      <input id="gi_riskPct" type="number" step="0.01" placeholder="0.12" />
+    </label>
+
+    <label>Target O.T.R.A.F.F ($/hr net)
+      <input id="gi_targetOtraf" type="number" step="1" placeholder="35" />
+    </label>
+
+    <label class="full-span">Region (Hybrid: auto-detect + manual override)
+      <select id="gi_regionOverride">
+        <option value="auto" selected>Auto-detect (recommended)</option>
+        <option value="northeast">Northeast / NYC / Toll Corridor</option>
+        <option value="metro">Major Metro (Chicago/LA/ATL/etc.)</option>
+        <option value="mountain">Mountain / High Elevation</option>
+        <option value="deadzone">Dead Zone / Low Reload Outbound</option>
+        <option value="highfuel">High Fuel Price Region (CA/NE)</option>
+        <option value="none">None (no region modifiers)</option>
+      </select>
+      <div class="hint">Detected region will display in the breakdown. Manual override is logged in output.</div>
+    </label>
+  </div>
+
+  <div class="row">
+    <button class="primary" id="gi_calcBtn" type="button">Calculate Minimum Rate</button>
+    <button id="gi_resetBtn" type="button">Reset</button>
+  </div>
+
+  <details class="note">
+    <summary><strong>Show Calculation Breakdown</strong></summary>
+    <pre class="output" id="gi_out">—</pre>
+  </details>
+</section>
+
+<!-- GATE (ORIGINAL) - Shipper-facing Invite-Only Quote (restored) -->
+<section class="screen" id="screen-gate">
+  <h1>Gate (Invite-Only Shipper Quote)</h1>
+  <p class="lockNotice">
+    🔒 <strong>Plain Lock:</strong> Shipper-facing “reverse scenario” quote. Shipper inputs lane variables only.
+    Carrier cost basis is read-only and pulled from Settings.
+  </p>
+
+  <div class="scenario-badge ok" id="gateBadge">⚪️ Waiting for inputs…</div>
+
+  <h2>Carrier Fixed Cost Basis (read-only)</h2>
+  <div class="grid">
+    <label>Monthly Fixed (Household + Business)
+      <input id="g_monthlyFixedRO" class="locked" type="number" step="0.01" readonly />
+    </label>
+    <label>Daily Fixed (÷ 30.4)
+      <input id="g_dailyFixedRO" class="locked" type="number" step="0.01" readonly />
+    </label>
+    <label>Fixed Cost per Hour Away (÷ 24)
+      <input id="g_fixedPerHrRO" class="locked" type="number" step="0.01" readonly />
+    </label>
+    <label>MPG Used (Lifetime or Fallback)
+      <input id="g_mpgUsedRO" class="locked" type="number" step="0.01" readonly />
+    </label>
+    <label>Fuel Price Used ($/gal)
+      <input id="g_fuelPrice" type="number" step="0.01" placeholder="3.60" />
+    </label>
+  </div>
+
+  <h2>Lane Variables (shipper enters)</h2>
+  <div class="grid">
+    <label>Lane Miles (pickup → delivery)
+      <input id="g_laneMiles" type="number" step="1" placeholder="e.g., 860" />
+    </label>
+    <label>Estimated Tolls ($)
+      <input id="g_tolls" type="number" step="0.01" placeholder="0" />
+    </label>
+
+    <label class="checkline">
+      <input id="g_deadzoneToggle" type="checkbox" />
+      Dead-Zone / Reposition Needed?
+    </label>
+
+    <label>Reposition Miles (auto when toggle on)
+      <input id="g_repositionMiles" type="number" step="1" placeholder="0" />
+    </label>
+
+    <label>Region Preset
+      <select id="g_regionPreset">
+        <option value="" selected>Select…</option>
+        <option value="metro">Major Metro (Chicago/LA/ATL/etc.)</option>
+        <option value="northeast">Northeast / NYC / Toll Corridor</option>
+        <option value="mountain">Mountain / Elevation</option>
+        <option value="highfuel">High Fuel Price Area (CA/NE)</option>
+        <option value="deadzone">Dead Zone / Low Reload Outbound</option>
+      </select>
+    </label>
+
+    <label>Risk Buffer (%)
+      <input id="g_riskPct" type="number" step="0.01" placeholder="0.08" />
+    </label>
+    <label>Target O.T.R.A.F.F ($/hr away)
+      <input id="g_targetOtraf" type="number" step="1" placeholder="35" />
+    </label>
+  </div>
+
+  <h2>Oversize / Specialty Trailer (auto)</h2>
+  <p class="hint">Enter load dimensions and choose route states. Oversize triggers automatically. Costs can be overridden per-state for closures, scarcity, and pilot-car availability.</p>
+  <div class="grid">
+    <label>Width (in)
+      <input id="g_os_width" type="number" step="1" placeholder="e.g., 156" />
+    </label>
+    <label>Height (in)
+      <input id="g_os_height" type="number" step="1" placeholder="e.g., 168" />
+    </label>
+    <label>Length (ft)
+      <input id="g_os_length" type="number" step="1" placeholder="e.g., 60" />
+    </label>
+    <label>Gross Weight (lbs)
+      <input id="g_os_weight" type="number" step="1" placeholder="e.g., 95000" />
+    </label>
+    <label class="full-span">Route States (multi-select)
+      <select id="g_routeStates" multiple size="6">
+        <option>AL</option><option>AK</option><option>AZ</option><option>AR</option><option>CA</option><option>CO</option><option>CT</option><option>DE</option><option>FL</option><option>GA</option>
+        <option>HI</option><option>ID</option><option>IL</option><option>IN</option><option>IA</option><option>KS</option><option>KY</option><option>LA</option><option>ME</option><option>MD</option>
+        <option>MA</option><option>MI</option><option>MN</option><option>MS</option><option>MO</option><option>MT</option><option>NE</option><option>NV</option><option>NH</option><option>NJ</option>
+        <option>NM</option><option>NY</option><option>NC</option><option>ND</option><option>OH</option><option>OK</option><option>OR</option><option>PA</option><option>RI</option><option>SC</option>
+        <option>SD</option><option>TN</option><option>TX</option><option>UT</option><option>VT</option><option>VA</option><option>WA</option><option>WV</option><option>WI</option><option>WY</option>
+      </select>
+      <div class="hint">Hold Ctrl (Windows) / Cmd (Mac) to select multiple. On mobile, tap to toggle selections.</div>
+    </label>
+    <label>Oversize Speed (mph) (default 55)
+      <input id="g_os_speed" type="number" step="1" value="55" />
+    </label>
+    <label>Usable Driving Hours/Day (default 7)
+      <input id="g_os_driveHours" type="number" step="0.5" value="7" />
+    </label>
+    <label class="checkline full-span">
+      <input id="g_weekendAuto" type="checkbox" checked />
+      Weekend Buffer Auto (+1 day when any state is weekend-restricted)
+    </label>
+    <label>Weekend Buffer (days)
+      <select id="g_weekendDays">
+        <option value="0">+0.0</option>
+        <option value="0.5">+0.5</option>
+        <option value="1" selected>+1.0</option>
+        <option value="2">+2.0</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="note full-span">
+    <div><strong>Specialty Trailer Positioning (Included)</strong></div>
+    <div class="grid" style="margin-top:10px;">
+      <label>Return Home Miles (default 250)
+        <input id="g_returnHomeMiles" type="number" step="1" value="250" />
+      </label>
+      <label>Return Home Day Add (default +1)
+        <select id="g_returnHomeDayAdd">
+          <option value="0">+0.0</option>
+          <option value="0.5">+0.5</option>
+          <option value="1" selected>+1.0</option>
+          <option value="2">+2.0</option>
+        </select>
+      </label>
+    </div>
+    <div class="muted">Included because specialty trailers often cannot secure a reload immediately.</div>
+  </div>
+
+  <h2>Applied State Rules (shipper-visible)</h2>
+  <pre class="output" id="g_appliedRules">—</pre>
+
+  <div class="row">
+    <button class="primary" id="g_calcBtn" type="button">Calculate Gate Quote</button>
+    <button id="g_resetBtn" type="button">Reset</button>
+  </div>
+
+  <pre class="output" id="g_out">Waiting for inputs…</pre>
+
+  <div class="lockBox">
+    <div class="lockTitle">What this “Gate” is for</div>
+    <ul class="lockList">
+      <li>Show a shipper the <strong>minimum</strong> a real truck needs to run a lane without cheap-freight damage.</li>
+      <li>Make the negotiation start with <strong>transparency</strong>: time away + fuel + fixed basis + risk.</li>
+      <li>Later: invite-only shipper accounts → direct messaging → posted loads → select vetted carriers.</li>
+    </ul>
+  </div>
+</section>
+<!-- SCENARIO -->
+<section class="screen" id="screen-scenario">
+<h1>Scenario (Estimate Only)</h1>
+<p class="lockNotice">
+        🔒 <strong>Plain Lock:</strong> Scenario is <strong>estimate-only</strong>. It never writes to History/Totals.
+        Required fields: <strong>Gross, Deadhead, Loaded</strong>. Return miles only count if “Returning Home/Yard?” is ON.
+      </p>
+<div aria-live="polite" class="lockWarn" id="scenarioLockWarn"></div>
+<div class="scenario-badge" id="scenarioBadge">⚪️ Waiting for inputs…</div>
+<details class="note" id="scenarioCityAuto">
+  <summary><strong>Auto-calc Miles from City/State (optional)</strong></summary>
+  <p class="hint">
+    Enter locations and click <strong>Auto-Fill Miles</strong>. This will fill <strong>Deadhead</strong>, <strong>Loaded</strong>,
+    and (if Returning Home is ON) <strong>Return</strong>. You can still manually edit miles anytime.
+  </p>
+
+  <div class="grid scenarioCityGrid">
+    <label>Truck Start (City, ST)
+      <input id="sc_fromLoc" type="text" placeholder="e.g., Columbus, OH" />
+    </label>
+
+    <label>Pickup (City, ST)
+      <input id="sc_pickupLoc" type="text" placeholder="e.g., Chicago, IL" />
+    </label>
+
+    <label>Delivery (City, ST)
+      <input id="sc_deliveryLoc" type="text" placeholder="e.g., Dallas, TX" />
+    </label>
+
+    <label>Home/Yard (City, ST) (Return)
+      <input id="sc_homeLoc" type="text" placeholder="e.g., Toledo, OH" />
+    </label>
+  </div>
+
+  <div class="row">
+<button class="primary" id="btnScenarioAutoMiles" type="button"
+  onclick="scenarioAutoFillMilesFromCities()">
+  Auto-Fill Miles
+</button>
+
+<button id="btnScenarioClearCities" type="button"
+  onclick="scenarioClearCityAutoFields()">
+  Clear Cities
+</button>
+    <span class="muted" id="sc_cityStatus">—</span>
+  </div>
+</details>
+<div class="grid">
+<label>Gross Revenue (required)
+          <input id="sc_gross" placeholder="2600" step="0.01" type="number"/>
+</label>
+<label>Deadhead Miles (required)
+          <input id="sc_deadhead" placeholder="72" step="0.1" type="number"/>
+</label>
+<label>Loaded Miles (required)
+          <input id="sc_loaded" placeholder="601" step="0.1" type="number"/>
+</label>
+<label class="inline">
+<input id="sc_returnToggle" type="checkbox"/>
+          Returning Home/Yard?
+        </label>
+<label>Return Miles (0 allowed)
+          <input id="sc_returnMiles" placeholder="0" step="0.1" type="number" value="0"/>
+</label>
+<label>Fuel Price ($/gal) (editable)
+          <input id="sc_fuelPrice" placeholder="3.60" step="0.01" type="number"/>
+</label>
+<label>Total Miles (auto)
+          <input class="locked" id="sc_totalMiles" readonly="" step="0.1" type="number"/>
+</label>
+<label>MPG Used (Lifetime) (read-only)
+          <input class="locked" id="sc_mpgUsed" readonly="" step="0.01" type="number"/>
+</label>
+<label>Estimated Gallons (read-only)
+          <input class="locked" id="sc_estGallons" readonly="" step="0.01" type="number"/>
+</label>
+<label>Estimated Fuel Cost ($) (read-only)
+          <input class="locked" id="sc_estFuelCost" readonly="" step="0.01" type="number"/>
+</label>
+<label>Total Hours Away (DOT min) (read-only)
+          <input class="locked" id="sc_estHoursAway" readonly="" step="0.1" type="number"/>
+</label>
+<label>Average MPH Used (read-only)
+          <input class="locked" id="sc_avgMphUsed" readonly="" step="1" type="number"/>
+</label>
+<label>O.T.R.A.F.F ($/hr away) (read-only)
+          <input class="locked" id="sc_otraff" readonly="" step="0.01" type="number"/>
+</label>
+<label>Scenario Net (read-only)
+          <input class="locked" id="sc_net" readonly="" step="0.01" type="number"/>
+</label>
+</div>
+<div class="row">
+<button class="primary" id="btnCalcScenario" type="button">Calculate Scenario</button>
+</div>
+<pre class="output" id="scenarioOut">—</pre>
+<p class="hint">Scenario never updates history or totals.</p>
+</section>
+<!-- TRIP -->
+<section class="screen" id="screen-trip">
+<h1>Trip</h1>
+<p class="hint">Create a Trip record (who/where) and save it. Scenario stays isolated.</p>
+<div class="hint" id="activeTripLabel"></div>
+<!-- Load Recall (Auto) -->
+<div class="row">
+<label class="grow">Load Recall (Auto)
+    <select id="t_loadRecall">
+<option value="">Select a saved load…</option>
+</select>
+</label>
+<button id="btnLoadRecall" type="button">Load</button>
+</div>
+<!-- Trip Basics -->
+<div class="grid">
+<label>Load Number
+      <input id="t_loadNumber" placeholder="e.g., 123456 / ABC-789" type="text"/>
+</label>
+<label>Pickup Date
+      <input id="t_pickupDate" type="date"/>
+</label>
+<label>Delivery Date
+      <input id="t_deliveryDate" type="date"/>
+</label>
+<label>Load Weight (lbs)
+      <input id="t_weightLbs" placeholder="e.g., 42000" step="1" type="number"/>
+</label>
+<label>Rate / Revenue ($)
+      <input id="t_rate" placeholder="e.g., 1700" step="0.01" type="number"/>
+</label>
+</div>
+<!-- Trip Routing (Auto Miles) -->
+<h2>Trip Miles Auto-Calc (Google Maps)</h2>
+<p class="hint">Enter Pickup and Delivery addresses, then tap Auto-Calculate Miles. Loaded miles will fill automatically. Optional: deadhead can auto-calc from the most recent saved Trip delivery.</p>
+<div class="grid">
+  <label>Pickup Address
+        <input id="t_pickupAddr" list="dl_pickupAddrs" placeholder="e.g., 123 Main St, Dallas, TX" type="text"/>
+  </label>
+  <label>Delivery Address
+        <input id="t_deliveryAddr" list="dl_deliveryAddrs" placeholder="e.g., 500 Market St, Atlanta, GA" type="text"/>
+  </label>
+</div>
+<div class="row trip-calc-row">
+  <button id="btnTripCalcMiles" type="button" class="btn-wide">Auto-Calculate Miles</button>
+  <span class="muted">Auto-fills loaded miles (pickup → delivery). If a prior Trip exists, deadhead auto-fills from last delivery → this pickup (when Deadhead is blank).</span>
+</div>
+
+<!-- Trip Miles + Fuel (Actual Inputs) -->
+<div class="grid">
+<label>Deadhead Miles
+      <input id="t_deadheadMiles" placeholder="e.g., 120" step="0.1" type="number"/>
+</label>
+<label>Loaded Miles
+      <input id="t_loadedMiles" placeholder="e.g., 400" step="0.1" type="number"/>
+</label>
+<label>Total Miles (auto)
+      <input class="locked" id="t_totalMiles" placeholder="auto" readonly="" step="0.1" type="number"/>
+</label>
+<label>Fuel Price ($/gal)
+      <input id="t_fuelPrice" placeholder="e.g., 3.60" step="0.01" type="number"/>
+</label>
+<label>Gallons (actual)
+      <input id="t_gallons" placeholder="e.g., 110.5" step="0.01" type="number"/>
+</label>
+</div>
+<!-- O.T.R.A.F.F (Trip) -->
+<h2>O.T.R.A.F.F (Trip)</h2>
+<p class="hint">Auto-calculates using Trip miles + fuel + rate, and DOT minimum time estimates.</p>
+<pre class="output" id="t_otraffOut">—</pre>
+<!-- Dropdown Sections -->
+<div class="trip-section">
+<button class="trip-toggle" type="button">Broker ▼</button>
+<div class="trip-content">
+<div class="grid">
+<label>Broker Name
+          <input id="t_brokerName" list="dl_brokerNames" placeholder="e.g., TQL / Landstar / ABC Logistics" type="text"/>
+
+          <div class="recallRow"><select id="t_brokerRecall"><option value="">Recall broker…</option></select></div>
+</label>
+<label>Broker Address
+          <input id="t_brokerAddr" placeholder="Street address" type="text"/>
+</label>
+<label>Broker Email
+          <input id="t_brokerEmail" placeholder="e.g., dispatch@broker.com" type="email"/>
+</label>
+<label>Broker Phone
+          <input id="t_brokerPhone" placeholder="e.g., 555-555-5555" type="tel"/>
+</label>
+</div>
+</div>
+</div>
+<div class="trip-section">
+<button class="trip-toggle" type="button">Shipper ▼</button>
+<div class="trip-content">
+<div class="grid">
+<label>Shipper Name
+         <input id="t_shipperName" list="dl_shipperNames" placeholder="Shipper name" type="text"/>
+
+         <div class="recallRow"><select id="t_shipperRecall"><option value="">Recall shipper…</option></select></div>
+</label>
+<label>Shipper Address
+          <input id="t_shipperAddr" placeholder="Street address" type="text"/>
+</label>
+<label>City
+          <input id="t_shipperCity" placeholder="City" type="text"/>
+</label>
+<label>State
+          <input id="t_shipperState" placeholder="ST" type="text"/>
+</label>
+<label>ZIP
+          <input id="t_shipperZip" placeholder="ZIP" type="text"/>
+</label>
+</div>
+</div>
+</div>
+<div class="trip-section">
+<button class="trip-toggle" type="button">Consignee ▼</button>
+<div class="trip-content">
+<div class="grid">
+<label>Consignee Name
+         <input id="t_consigneeName" list="dl_consigneeNames" placeholder="Consignee name" type="text"/>
+
+         <div class="recallRow"><select id="t_consigneeRecall"><option value="">Recall consignee…</option></select></div>
+</label>
+<label>Consignee Address
+          <input id="t_consigneeAddr" placeholder="Street address" type="text"/>
+</label>
+<label>City
+          <input id="t_consigneeCity" placeholder="City" type="text"/>
+</label>
+<label>State
+          <input id="t_consigneeState" placeholder="ST" type="text"/>
+</label>
+<label>ZIP
+          <input id="t_consigneeZip" placeholder="ZIP" type="text"/>
+</label>
+</div>
+</div>
+</div>
+<datalist id="dl_brokerNames"></datalist>
+<datalist id="dl_shipperNames"></datalist>
+<datalist id="dl_consigneeNames"></datalist>
+<hr/>
+<h2>Broker Email (Auto-Fill)</h2>
+<p class="lockNotice">🔒 <strong>Plain Code:</strong> Uses the current Trip’s Broker Email + Load info. Edit the fields above first, then tap send.</p>
+<div class="row">
+<button class="primary" id="btnTripFirmEmail" type="button">Send Firm Email</button>
+<button id="btnTripPraiseEmail" type="button">Send Praise Email</button>
+</div>
+<div class="row">
+<button class="primary" id="btnSaveTrip" type="button">Save Trip</button>
+<button id="btnNewTrip" type="button">New Trip</button>
+</div>
+<p class="hint" id="tripHint"></p>
+<hr/>
+<h2>Saved Trips</h2>
+<p class="hint">Sorted by Pickup Date (newest first). Tap a load to make it Active. Use the arrow to expand/collapse details.</p>
+<div class="list" id="tripList"></div>
+<hr/>
+<h2>Trip Files (Rate Confirmations)</h2>
+<p class="hint">Attach uploads to a specific saved Trip (Load). Choose the Trip below, then add files (PDF/Image). Files are stored on this device (GitHub Pages safe).</p>
+
+<div class="row">
+  <label class="inlineLabel" for="tripFilesTripSelect">Attach files to:</label>
+  <select id="tripFilesTripSelect"></select>
+</div>
+
+<div class="row">
+  <input id="tripFilesLabel" type="text" placeholder="Optional label (Rate Con, BOL, Lumper, etc.)" />
+</div>
+
+<div class="row">
+  <input id="tripFilesInput" type="file" multiple accept="application/pdf,image/*" />
+</div>
+
+<div class="row">
+  <button class="primary" id="btnTripFilesAdd" type="button">Add Files to Selected Trip</button>
+  <button id="btnTripFilesClear" type="button">Clear Files for Selected Trip</button>
+</div>
+
+<p class="hint" id="tripFilesHint"></p>
+<div class="output" id="tripFilesList">No files attached yet.</div>
+
+<hr/>
+<h2>Invoice</h2>
+<p class="lockNotice">🔒 <strong>Plain Lock:</strong> Invoice auto-fills from the selected Trip (Active Trip).</p>
+<div class="row">
+<button class="primary" id="btnInvoice" type="button">Generate Invoice</button>
+<button disabled id="btnPrintInvoice" type="button">Print Invoice</button>
+<button disabled id="btnPdfInvoice" type="button">Create PDF</button>
+</div>
+<!-- Invoice preview (HTML will render here) -->
+<div class="output" id="invoiceOut">Invoice output will appear here.</div>
+<h2>Remittance Info (Auto-Saves)</h2>
+<label>
+<textarea id="t_remitInfo" placeholder="Type remittance info here (auto-saves)" rows="6"></textarea>
+</label>
+<p class="hint">This remittance info is global (used for every load/invoice).</p>
+</section>
+<!-- ACTUAL -->
+<section class="screen" id="screen-actual">
+<h1>Actual (Performance Only)</h1>
+<p class="hint">
+    Actual is <strong>read-only</strong>. It pulls numbers from <strong>Trips</strong>. Select a load below.
+  </p>
+<!-- Base (pulled from Trips) -->
+<div class="grid">
+<label>Load Dropdown (from Trips)
+      <select id="a_tripSelect">
+<option value="">— Select a saved load —</option>
+</select>
+</label>
+<div class="row" style="grid-column: 1 / -1; gap: 10px;">
+<button id="btnUseTripForActual" type="button">Use Selected Load</button>
+<span class="hint" id="actualTripRefHint"></span>
+</div>
+
+<label>Load Number (from Trip)
+      <input id="a_loadNumber" readonly type="text"/>
+</label>
+
+<label>Broker Name (from Trip)
+      <input id="a_brokerName" readonly type="text"/>
+</label>
+<label>Broker Address (from Trip)
+      <input id="a_brokerAddr" readonly type="text"/>
+</label>
+<label>Broker Phone (from Trip)
+      <input id="a_brokerPhone" readonly type="text"/>
+</label>
+<label>Broker Email (from Trip)
+      <input id="a_brokerEmail" readonly type="text"/>
+</label>
+
+<label>Shipper Name (from Trip)
+      <input id="a_shipperName" readonly type="text"/>
+</label>
+<label>Shipper Address (from Trip)
+      <input id="a_shipperAddr" readonly type="text"/>
+</label>
+
+<label>Consignee Name (from Trip)
+      <input id="a_consigneeName" readonly type="text"/>
+</label>
+<label>Consignee Address (from Trip)
+      <input id="a_consigneeAddr" readonly type="text"/>
+</label>
+
+<label>Delivery Date
+      <input disabled="" id="a_deliveryDate" type="date"/>
+</label>
+<label>Deadhead Miles
+      <input id="a_deadhead" readonly="" step="0.1" type="number"/>
+</label>
+<label>Loaded Miles
+      <input id="a_loaded" readonly="" step="0.1" type="number"/>
+</label>
+<label>Total Trip Miles
+      <input id="a_tripMiles" readonly="" step="1" type="number"/>
+</label>
+<label>Fuel Price / Gal
+      <input id="a_fuelPrice" readonly="" step="0.001" type="number"/>
+</label>
+<label>Gallons
+      <input id="a_gallons" readonly="" step="0.1" type="number"/>
+</label>
+<label>Gross Revenue (Rate)
+      <input id="a_gross" readonly="" step="0.01" type="number"/>
+</label>
+<label>Hours Away From Family (auto)
+      <input id="a_hoursAway" readonly="" step="0.1" type="number"/>
+</label>
+<p class="hint" style="margin:0; grid-column: 1 / -1;">
+      Lifetime Average MPG:
+      <strong id="lifetimeAvgMpg">0.00</strong>
+</p>
+</div>
+<!-- Actual add-ons (wait time / detention / expenses) -->
+<h2>Wait Time + Detention + Other Expenses (Actual)</h2>
+<p class="hint" style="margin-top: 0;">These fields belong to <b>Actual</b> only. Detention rate is locked to <b>$100/hr minimum</b>. Each location has <b>1.0 hour free</b>.</p>
+<div class="grid">
+<label>Actual O.T.R.A.F.F (manual) ($/hr)
+      <input id="a_manualOTRAFF" min="0" step="0.01" type="number" value="2.00">
+</input></label>
+<label>Wait Time — Shipper (hrs) (1.0 free)
+      <input id="a_waitShipper" min="0" step="0.1" type="number" value="0">
+</input></label>
+<label>Wait Time — Consignee (hrs) (1.0 free)
+      <input id="a_waitConsignee" min="0" step="0.1" type="number" value="0">
+</input></label>
+<label>Detention Bill Hours (editable)
+      <input id="a_detBillHours" min="0" placeholder="auto" step="0.1" type="number">
+<div class="hint">Blank = auto (wait minus 1.0 free each).</div>
+</input></label>
+<label>Detention Rate ($/hr) (min $100/hr)
+      <input id="a_detRate" min="0" step="1" type="number" value="100">
+</input></label>
+<label>Detention Total (auto)
+      <input class="locked" id="a_detTotal" placeholder="auto" readonly="" type="text">
+</input></label>
+<label>Detention Cost (from waiting) ($/hr) (auto)
+      <input class="locked" id="a_waitCostPerHr" placeholder="auto" readonly="" type="text">
+</input></label>
+<label>You Lost (from waiting) (auto)
+      <input class="locked" id="a_waitLost" placeholder="auto" readonly="" type="text">
+</input></label>
+</div>
+<div class="grid" style="margin-top: 10px;">
+<label>Other Expense Type
+      <select id="a_expType">
+<option value="Maintenance">Maintenance</option>
+<option value="Tolls">Tolls</option>
+<option value="Oil">Oil</option>
+<option value="Repairs">Repairs</option>
+<option value="Tires">Tires</option>
+<option value="Scale">Scale</option>
+<option value="Lumper">Lumper</option>
+<option value="Other">Other</option>
+</select>
+</label>
+<label>Other Expense Amount ($)
+      <input id="a_expAmount" min="0" placeholder="0.00" step="0.01" type="number">
+</input></label>
+<div class="row" style="align-items:flex-end; margin-top: 0;">
+<button id="btnAddActualExpense" type="button">Add Expense</button>
+</div>
+<label>Other Expenses Total (auto)
+      <input class="locked" id="a_otherExpensesTotal" placeholder="auto" readonly="" type="text">
+</input></label>
+</div>
+<div class="list" id="actualExpenseList" style="margin-top: 12px;"></div>
+<div class="row">
+<button class="primary" id="btnCalcActual" type="button">Calculate Actual</button>
+<button id="btnSaveActual" type="button">Save Actual to History + Totals</button>
+</div>
+<pre class="output" id="actualOut">—</pre>
+<pre class="output" id="a_dotBreakdown">—</pre>
+<p class="hint" id="actualHint"></p>
+</section>
+<!-- TOTALS -->
+
+<section class="screen" id="screen-reserve">
+  <h1>Reserve Totals</h1>
+  <p class="hint">Auto-calculated from saved <b>Actual</b> loads using your Settings reserve percentages. Updates automatically when you save Actual or change Settings.</p>
+  <div class="panel">
+    <pre class="output" id="reserveOut">—</pre>
+  </div>
+</section>
+
+
+<section class="screen" id="screen-bank">
+  <h1>Bank (Available)</h1>
+  <p class="hint">Auto-calculated from saved <b>Actual</b> loads: Available after Fixed Costs + Reserve allocation. Updates automatically when you save Actual or change Settings.</p>
+  <div class="panel">
+    <pre class="output" id="bankOut">—</pre>
+  </div>
+</section>
+
+<section class="screen" id="screen-totals">
+<h1>Totals (Actual Only)</h1>
+<div class="row">
+<button class="primary" id="btnRefreshTotals" type="button">Refresh Totals</button>
+<button class="danger" id="btnClearAll" type="button">Clear All Local Data</button>
+</div>
+<pre class="output" id="totalsOut">—</pre>
+<p class="hint">Scenario never touches totals. Actual updates by delivery month and YTD.</p>
+</section>
+
+<!-- FLEET -->
+<section class="screen" id="screen-fleet">
+  <h1>Fleet — Driver + Owner Pay</h1>
+  <p class="hint">Track driver pay splits per load. Supports Gross-vs-Net pay toggle (per settlement) so you can protect the driver when needed.</p>
+
+  <details class="collapsibleSection">
+    <summary>Drivers (Add / Edit)</summary>
+    <div class="collapsibleInner">
+      <div class="grid">
+        <label>Driver
+          <select id="f_driverSelect"></select>
+        </label>
+
+        <label>Driver Name
+          <input id="f_driverName" type="text" placeholder="e.g. John Doe"/>
+        </label>
+
+        <label>Driver Type
+          <select id="f_driverType">
+            <option value="company">Company Driver</option>
+            <option value="ownerop">Owner-Operator (Leased On)</option>
+          </select>
+        </label>
+
+        <label>Default Pay Basis
+          <select id="f_defaultBasis">
+            <option value="net">Net (recommended)</option>
+            <option value="gross">Gross</option>
+          </select>
+        </label>
+
+        <label>Default Pay Method
+          <select id="f_defaultPayType">
+            <option value="pct">Percent (%)</option>
+            <option value="permile">$ / Mile</option>
+            <option value="flat">Flat $</option>
+          </select>
+        </label>
+
+        <label>Default % (if Percent)
+          <input id="f_defaultPct" type="number" step="0.01" placeholder="0.30 or 30"/>
+        </label>
+
+        <label>Default $/Mile (if $/Mile)
+          <input id="f_defaultPerMile" type="number" step="0.01" placeholder="0.60"/>
+        </label>
+
+        <label>Default Flat $ (if Flat)
+          <input id="f_defaultFlat" type="number" step="0.01" placeholder="150"/>
+        </label>
+      </div>
+
+      <div class="row">
+        <button class="primary" id="btnFleetSaveDriver" type="button">Save Driver</button>
+        <button id="btnFleetNewDriver" type="button">New Driver</button>
+        <button class="danger" id="btnFleetDeleteDriver" type="button">Delete Driver</button>
+      </div>
+
+      <p class="hint" id="fleetDriverHint"></p>
+    </div>
+  </details>
+
+  <details class="collapsibleSection">
+    <summary>Settlement (Per Load)</summary>
+    <div class="collapsibleInner">
+      <div class="grid">
+        <label>Pick Saved Actual Load
+          <select id="f_loadSelect"></select>
+        </label>
+
+        <label>Primary Driver
+          <select id="f_primaryDriver"></select>
+        </label>
+
+        <label class="check">
+          <input id="f_isRepowerSplit" type="checkbox"/>
+          Repower split (two drivers, split by <strong>loaded miles</strong>)
+        </label>
+
+        <label>Secondary Driver (repower)
+          <select id="f_secondaryDriver"></select>
+        </label>
+
+        <label>Primary Loaded Miles Driven (repower)
+          <input id="f_primaryLoadedMiles" type="number" step="1" placeholder="e.g. 250"/>
+        </label>
+
+        <label>Secondary Loaded Miles Driven (auto)
+          <input id="f_secondaryLoadedMiles" type="number" step="1" readonly placeholder="auto"/>
+        </label>
+
+
+        <label>Pay Basis (company setting)
+  <select id="f_payBasis" disabled>
+    <option value="net">Pay from Net</option>
+    <option value="gross">Pay from Gross</option>
+  </select>
+</label>
+
+        <label>Pay Method
+          <select id="f_payType">
+            <option value="pct">Percent (%)</option>
+            <option value="permile">$ / Mile</option>
+            <option value="flat">Flat $</option>
+          </select>
+        </label>
+
+        <label>% (if Percent)
+          <input id="f_pct" type="number" step="0.01" placeholder="0.30 or 30"/>
+        </label>
+
+        <label>$ / Mile (if $/Mile)
+          <input id="f_perMile" type="number" step="0.01" placeholder="0.60"/>
+        </label>
+
+        <label>Flat $ (if Flat)
+          <input id="f_flat" type="number" step="0.01" placeholder="150"/>
+        </label>
+
+        <label>Advance (deduct from driver pay)
+          <input id="f_advance" type="number" step="0.01" placeholder="0"/>
+        </label>
+
+        <label>Minimum Driver Pay (optional)
+          <input id="f_minPay" type="number" step="0.01" placeholder="0"/>
+        </label>
+
+        <label class="check">
+          <input id="f_protectDriver" type="checkbox" checked/>
+          Protect Driver (company covers shortfall)
+        </label>
+
+        <label class="check">
+          <input id="f_repower" type="checkbox"/>
+          Repower / Rescue (forces Gross basis)
+        </label>
+
+        <label>Notes (optional)
+          <input id="f_notes" type="text" placeholder="e.g., breakdown / layover / repower detail"/>
+        </label>
+      </div>
+
+      <div class="row">
+        <button class="primary" id="btnFleetCalc" type="button">Calculate Settlement</button>
+        <button id="btnFleetSaveSettlement" type="button">Save Settlement</button>
+        <button class="danger" id="btnFleetClearSettlements" type="button">Clear Settlements</button>
+      </div>
+
+      <pre class="output" id="fleetOut">—</pre>
+      <p class="hint" id="fleetSettleHint"></p>
+    </div>
+  </details>
+
+  
+  <details class="collapsibleSection">
+    <summary>Pay Period Settlement (Weekly)</summary>
+    <div class="collapsibleInner">
+      <div class="grid">
+        <label>Driver
+          <select id="f_periodDriver"></select>
+        </label>
+        <label>Week of (pick any date in the week)
+          <input id="f_weekOf" type="date"/>
+        </label>
+        <label>Week Starts On
+          <select id="f_periodWeekStart">
+            <option value="MON">Monday</option>
+            <option value="SUN">Sunday</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <button class="primary" id="btnFleetRunPeriod" type="button">Generate Weekly Summary</button>
+        <button id="btnFleetExportPeriod" type="button">Export Weekly Summary JSON</button>
+      </div>
+      <pre class="output" id="fleetPeriodOut">—</pre>
+      <p class="hint">This summary uses delivered dates from saved Actual loads. It does not modify loads.</p>
+    </div>
+  </details>
+
+
+  <details class="collapsibleSection">
+    <summary>Settlement History</summary>
+    <div class="collapsibleInner">
+      <div class="panel">
+        <div class="row">
+          <button id="btnFleetRefreshHistory" type="button">Refresh</button>
+        </div>
+        <div class="tableWrap">
+          <table class="fleetTable" id="fleetHistoryTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Driver</th>
+                <th>Load</th>
+                <th>Basis</th>
+                <th>Driver Pay</th>
+                <th>Owner/Company</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="hint">Tip: Settlements are separate from Actual history. Actual remains the source-of-truth for load economics.</p>
+    </div>
+  </details>
+
+</section>
+
+<!-- BROKER -->
+<section class="screen" id="screen-broker">
+<h1>Broker Emails</h1>
+<p class="hint">Uses the most recently saved Actual load.</p>
+<div class="row">
+<button class="primary" id="btnFirmEmail" type="button">Generate Firm Email</button>
+<button id="btnPraiseEmail" type="button">Generate Praise Email</button>
+</div>
+<pre class="output" id="brokerOut">—</pre>
+</section>
+<!-- LOADS (ONLY ONE COPY) -->
+<section class="screen" id="screen-loads">
+<h1>Saved Actual Loads</h1>
+<button class="primary" id="btnRefreshLoads" type="button">Refresh List</button>
+<div class="loadsSelectRow" style="margin-top:10px;">
+  <label style="width:100%;">Load Dropdown (Saved Actual)
+    <select id="loadsSelect">
+      <option value="">— Select a saved Actual load —</option>
+    </select>
+  </label>
+</div>
+<!-- legacy container kept for backwards compatibility (now unused) -->
+<div class="list" id="loadsList" style="display:none;"></div>
+<pre class="output" id="loadDetailOut" style="margin-top:14px;">Select a load from the dropdown to see details.</pre>
+
+<div class="row" style="margin-top:10px;">
+  <button id="btnDeleteSelectedLoad" type="button" disabled>Delete Selected</button>
+  <button id="btnClearAllLoads" type="button">Clear All Loads</button>
+</div>
+<p class="hint" id="loadsDeleteHint" style="margin-top:8px;">Tip: If you saved the same load multiple times, Delete Selected will remove the one you tapped.</p>
+</section>
+</main>
+<!-- scripts only once, inside body -->
+<!-- Optional mobile console. Guarded so the app never breaks if the CDN is blocked. -->
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>
+    try { if (window.eruda) window.eruda.init(); } catch (e) {}
+  </script>
+	<!-- Google Maps (embedded key) for Trip miles auto-calc -->
+	<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDN41I1r3by8ZAH-midWCbD2QoMZznHyog"></script>
+<script src="app.js?v=autosaveAddr1"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+
+</div>
+</body>
+</html>
